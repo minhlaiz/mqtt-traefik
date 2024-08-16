@@ -1,0 +1,46 @@
+networks:
+  mqtt:
+    driver: bridge
+
+services:
+  reverse-proxy:
+    image: traefik:latest
+    container_name: "traefik"
+    # Enables the web UI
+    command: 
+      - "--log.level=DEBUG"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedByDefault=false"
+      - "--entrypoints.mqtt.address=:1883"
+    ports:
+      # Mosquitto
+      - "1883:1883"
+    volumes:
+      # So that Traefix can listen to the Docker events
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - mqtt
+      
+  mqtt:
+    container_name: mqtt
+    image: eclipse-mosquitto
+    networks:
+      - mqtt
+    restart: always
+    expose:
+      - 1883
+    volumes:
+      - ./config:/mosquitto/config/
+
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=mqtt"
+      - "traefik.tcp.services.mqtt.loadbalancer.server.port=1883"
+      - "traefik.tcp.routers.tcpr_mqtt.entrypoints=mqtt"
+      - "traefik.tcp.routers.tcpr_mqtt.rule=HostSNI(`*`)"
+      - "traefik.tcp.routers.tcpr_mqtt.service=mqtt"
+
+version: "3.4"
+
+volumes: 
+  mqtt: ~
